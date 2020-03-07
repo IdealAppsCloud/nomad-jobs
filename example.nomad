@@ -1,6 +1,10 @@
 job "example" {
-  datacenters = ["services"]
+  datacenters = ["waldorf","statler"]
   type = "service"
+
+  spread {
+    attribute = "${node.datacenter}"
+  }
 
   group "nginx" {
     count = 2
@@ -21,8 +25,8 @@ job "example" {
       }
 
       resources {
-        cpu    = 100 # 100 MHz
-        memory = 128 # 128 MB
+        cpu    = 100 # MHz
+        memory = 128 # MB
         network {
           mbits = 10
           port "http" {}

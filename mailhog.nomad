@@ -1,14 +1,9 @@
 job "mailhog" {
-  datacenters = ["lab"]
+  datacenters = ["mgmt"]
   type = "service"
 
   group "mailhog" {
     count = 1
-
-    constraint {
-      operator  = "distinct_hosts"
-      value     = "true"
-    }
 
     task "mailhog" {
       driver = "docker"
