@@ -1,8 +1,8 @@
-job "faas-nomadd" {
-  datacenters = ["mgmt"]
-  type = "system"
+job "openfaas-nomad" {
+  datacenters = ["waldorf","statler"]
+  type = "service"
 
-  group "faas-nomadd" {
+  group "openfaas" {
     count = 1
 
     restart {
@@ -12,17 +12,27 @@ job "faas-nomadd" {
       mode     = "delay"
     }
 
-    task "nomadd" {
+    task "faas" {
       driver = "docker"
 
+      template {
+        env = true
+        destination   = "secrets/faas.env"
+
+        data = <<EOH
+{{ range service "statsd" }}
+STATSD_ADDR="{{ .Address }}:{{ .Port }}"{{ end }}
+EOH
+      }
+
       config {
-        image = "quay.io/nicholasjackson/faas-nomad:v0.4.3-rc2"
+        image = "quay.io/nicholasjackson/faas-nomad:v0.4.3"
 
         args = [
           "-nomad_region", "${NOMAD_REGION}",
           "-nomad_addr", "${NOMAD_IP_http}:4646",
           "-consul_addr", "${NOMAD_IP_http}:8500",
-          "-statsd_addr", "${NOMAD_ADDR_statsd_statsd}",
+          "-statsd_addr", "${STATSD_ADDR}",
           "-node_addr", "${NOMAD_IP_http}",
           "-basic_auth_secret_path", "/secrets",
           "-enable_basic_auth=false",
@@ -43,9 +53,7 @@ job "faas-nomadd" {
         network {
           mbits = 10
 
-          port "http" {
-            static = 8081
-          }
+          port "http" {}
         }
       }
 
@@ -63,7 +71,7 @@ job "faas-nomadd" {
         destination   = "secrets/gateway.env"
 
         data = <<EOH
-functions_provider_url="http://{{ env "NOMAD_IP_http" }}:8081/"
+functions_provider_url="http://{{ env "NOMAD_ADDR_faas_http" }}/"
 {{ range service "prometheus" }}
 faas_prometheus_host="{{ .Address }}"
 faas_prometheus_port="{{ .Port }}"{{ end }}
@@ -75,7 +83,7 @@ EOH
       }
 
       config {
-        image = "openfaas/gateway:0.18.10"
+        image = "openfaas/gateway:0.18.11"
 
         port_map {
           http = 8080
@@ -89,64 +97,22 @@ EOH
         network {
           mbits = 10
 
-          port "http" {
-            static = 8080
-          }
+          port "http" {}
         }
       }
 
       service {
         port = "http"
         name = "gateway"
-        tags = ["faas"]
-      }
-    }
-
-    task "statsd" {
-      driver = "docker"
-
-      config {
-        image = "prom/statsd-exporter:v0.4.0"
-
-        args = [
-          "-log.level=debug",
+        tags = [
+          "faas",
+          "traefik.enable=true",
         ]
-      }
-
-      resources {
-        cpu    = 100 # MHz
-        memory = 36 # MB
-
-        network {
-          mbits = 1
-
-          port "http" {
-            static = 9102
-          }
-
-          port "statsd" {
-            static = 9125
-          }
-        }
-      }
-
-      service {
-        port = "http"
-        name = "statsd"
-        tags = ["faas"]
-
-        check {
-          type     = "http"
-          port     = "http"
-          interval = "10s"
-          timeout  = "2s"
-          path     = "/"
-        }
       }
     }
   }
 
-  group "faas-nats" {
+  group "openfaas-async" {
     count = 1
 
     restart {
@@ -158,9 +124,9 @@ EOH
 
     task "nats" {
       driver = "docker"
-      
+
       config {
-        image = "nats-streaming:0.11.2-linux"
+        image = "nats-streaming:0.17.0-linux"
 
         args = [
           "-store", "file", "-dir", "/tmp/nats",
