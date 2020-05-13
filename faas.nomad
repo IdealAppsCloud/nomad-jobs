@@ -1,4 +1,4 @@
-job "openfaas-nomad" {
+job "OpenFaas" {
   datacenters = ["waldorf","statler"]
   type = "service"
 
@@ -87,6 +87,7 @@ EOH
 
         port_map {
           http = 8080
+          metrics = 8082
         }
       }
 
@@ -98,6 +99,7 @@ EOH
           mbits = 10
 
           port "http" {}
+          port "metrics" {}
         }
       }
 
@@ -108,6 +110,64 @@ EOH
           "faas",
           "traefik.enable=true",
         ]
+      }
+
+      service {
+        port = "metrics"
+        name = "gateway-metrics"
+        tags = [
+          "faas",
+          "metrics",
+        ]
+      }
+    }
+  }
+
+  group "openfaas-idler" {
+    count = 1
+
+    restart {
+      attempts = 10
+      interval = "5m"
+      delay    = "25s"
+      mode     = "delay"
+    }
+
+    task "idler" {
+      driver = "docker"
+
+      template {
+        env = true
+        destination   = "secrets/idler.env"
+
+        data = <<EOH
+{{ range service "gateway" }}
+gateway_url="http://{{ .Address }}:{{ .Port }}/"{{ end }}
+{{ range service "prometheus" }}
+prometheus_host="{{ .Address }}"
+prometheus_port="{{ .Port }}"{{ end }}
+inactivity_duration="2m"
+reconcile_interval="1m"
+write_debug=true
+EOH
+      }
+
+      config {
+        image = "openfaas/faas-idler:0.2.3"
+      }
+
+      resources {
+        cpu    = 500 # MHz
+        memory = 128 # MB
+
+        network {
+          mbits = 10
+        }
+      }
+
+      service {
+        name = "faasd-idler"
+        tags = ["faas"]
       }
     }
   }
@@ -126,7 +186,7 @@ EOH
       driver = "docker"
 
       config {
-        image = "nats-streaming:0.17.0-linux"
+        image = "nats-streaming:0.11.2-linux"
 
         args = [
           "-store", "file", "-dir", "/tmp/nats",
@@ -142,7 +202,7 @@ EOH
       }
 
       resources {
-        cpu    = 400 # MHz
+        cpu    = 500 # MHz
         memory = 128 # MB
 
         network {
