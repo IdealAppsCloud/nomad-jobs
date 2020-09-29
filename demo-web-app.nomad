@@ -1,5 +1,5 @@
 job "nomad-vault-demo" {
-  datacenters = ["waldorf","statler"]
+  datacenters = ["mgmt"]
   type = "service"
 
   group "demo" {

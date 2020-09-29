@@ -1,5 +1,5 @@
 job "postgres-nomad-demo" {
-  datacenters = ["waldorf","statler"]
+  datacenters = ["mgmt"]
   type = "service"
 
   group "db" {

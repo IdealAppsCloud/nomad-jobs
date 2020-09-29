@@ -8,6 +8,10 @@ job "{{service_name}}" {
     unlimited = true
   }
 
+  spread {
+    attribute = "${node.datacenter}"
+  }
+
   update {
     max_parallel      = 1
     health_check      = "checks"
@@ -22,6 +26,11 @@ job "{{service_name}}" {
   group "{{service_name}}" {
     count = "{{count}}"
 
+    constraint {
+      operator  = "distinct_hosts"
+      value     = "true"
+    }
+    
     restart {
       interval = "10m"
       attempts = 2
@@ -31,6 +40,7 @@ job "{{service_name}}" {
 
     task "{{service_name}}" {
       driver = "docker"
+
       config {
         image = "{{docker_image}}:{{image_version}}"
         port_map = {

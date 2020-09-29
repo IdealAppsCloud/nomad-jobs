@@ -1,5 +1,5 @@
 job "OpenFaas" {
-  datacenters = ["waldorf","statler"]
+  datacenters = ["mgmt"]
   type = "service"
 
   group "openfaas" {
